@@ -27,24 +27,24 @@ import time
 import torch
 import torch.nn as nn
 
-from dataset import SeqDataset
-from model import model_loader
+from sodeep import dataset
+from sodeep import model
 from torch.utils.data import DataLoader, SubsetRandomSampler
 from torch.optim.lr_scheduler import StepLR
 from tensorboardX import SummaryWriter
-from utils import AverageMeter, save_checkpoint, log_epoch, count_parameters
+from sodeep import utils
 
 
-device = torch.device("cuda")
+device = torch.device("cuda:0")
 # device = torch.device("cpu")
 
 
 def train(train_loader, model, criterion, optimizer, epoch, print_freq=1):
     model.train()
 
-    batch_time = AverageMeter()
-    data_time = AverageMeter()
-    losses = AverageMeter()
+    batch_time = utils.AverageMeter()
+    data_time = utils.AverageMeter()
+    losses = utils.AverageMeter()
 
     end = time.time()
     for i, (s, r) in enumerate(train_loader):
@@ -84,9 +84,9 @@ def train(train_loader, model, criterion, optimizer, epoch, print_freq=1):
 def validate(val_loader, model, criterion, print_freq=1):
     model.eval()
 
-    batch_time = AverageMeter()
-    data_time = AverageMeter()
-    losses = AverageMeter()
+    batch_time = utils.AverageMeter()
+    data_time = utils.AverageMeter()
+    losses = utils.AverageMeter()
 
     end = time.time()
     for i, (s, r) in enumerate(val_loader):
@@ -134,18 +134,21 @@ if __name__ == '__main__':
     parser.add_argument("-d", dest="dist", help="index of a single distribution for dataset if None all the distribution will be used.", default=None)
     parser.add_argument('-m', dest="model_type", help="Specify which model to use. (lstm, grus, gruc, grup, exa, lstmla, lstme, mlp, cnn) ", default='lstmla')
 
-    args = parser.parse_args()
+    # args = parser.parse_args()
+    args = parser.parse_args([
+        '-m', 'gruc', '-n', 'model_gruc', '-d', '1', '-slen', '2016', '-bs', '512'
+    ])
 
     print("Using GPUs: ", os.environ['CUDA_VISIBLE_DEVICES'])
 
     writer = SummaryWriter(os.path.join("./logs/", args.name))
 
-    dset = SeqDataset(args.seq_len, dist=args.dist)
+    dset = dataset.SeqDataset(args.seq_len, dist=args.dist)
 
     train_loader = DataLoader(dset, batch_size=args.batch_size, shuffle=False, num_workers=2, sampler=SubsetRandomSampler(range(int(len(dset) * 0.1), len(dset))))
     val_loader = DataLoader(dset, batch_size=args.batch_size, shuffle=False, num_workers=2, sampler=SubsetRandomSampler(range(int(len(dset) * 0.1))))
 
-    model = model_loader(args.model_type, args.seq_len)
+    model = model.model_loader(args.model_type, args.seq_len)
     model.to(device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
@@ -153,9 +156,11 @@ if __name__ == '__main__':
 
     criterion = nn.L1Loss()
 
-    print("Nb parameters:", count_parameters(model))
+    print("Nb parameters:", utils.count_parameters(model))
 
     start_epoch = 0
+    epochs_without_improvement = 0
+    patience = 2
     best_rec = 10000
     for epoch in range(start_epoch, args.mepoch):
         is_best = False
@@ -165,7 +170,10 @@ if __name__ == '__main__':
 
         if(val_loss < best_rec):
             best_rec = val_loss
+            epochs_without_improvement = 0
             is_best = True
+        else:
+            epochs_without_improvement += 1
 
         state = {
             'epoch': epoch,
@@ -174,8 +182,11 @@ if __name__ == '__main__':
             'args_dict': args
         }
 
-        log_epoch(writer, epoch, train_loss, val_loss, optimizer.param_groups[0]['lr'], batch_train, batch_val, data_train, data_val)
-        save_checkpoint(state, is_best, args.name, epoch)
+        utils.log_epoch(writer, epoch, train_loss, val_loss, optimizer.param_groups[0]['lr'], batch_train, batch_val, data_train, data_val)
+        utils.save_checkpoint(state, is_best, args.name, epoch)
+
+        if epochs_without_improvement > patience:
+            break
 
     print('Finished Training')
     print(best_rec)

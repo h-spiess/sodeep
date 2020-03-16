@@ -22,8 +22,7 @@ Author: Martin Engilberge
 
 import torch
 
-from model import model_loader
-from utils import get_rank
+from sodeep import utils, model
 
 
 def load_sorter(checkpoint_path):
@@ -43,7 +42,7 @@ class RankHardLoss(torch.nn.Module):
         self.nmax = nmax
         self.margin = margin
 
-        self.sorter = model_loader(sorter_type, seq_len, sorter_state_dict)
+        self.sorter = model.model_loader(sorter_type, seq_len, sorter_state_dict)
 
     def hc_loss(self, scores):
         rank = self.sorter(scores)
@@ -74,7 +73,7 @@ class RankLoss(torch.nn.Module):
     """ Loss function  inspired by recall """
     def __init__(self, sorter_type, seq_len=None, sorter_state_dict=None,):
         super(RankLoss, self).__init__()
-        self.sorter = model_loader(sorter_type, seq_len, sorter_state_dict)
+        self.sorter = model.model_loader(sorter_type, seq_len, sorter_state_dict)
 
     def forward(self, scores):
         """ Expect a score matrix with scores of the positive pairs are on the diagonal """
@@ -117,7 +116,7 @@ class SpearmanLoss(torch.nn.Module):
     """
     def __init__(self, sorter_type, seq_len=None, sorter_state_dict=None, lbd=0):
         super(SpearmanLoss, self).__init__()
-        self.sorter = model_loader(sorter_type, seq_len, sorter_state_dict)
+        self.sorter = model.model_loader(sorter_type, seq_len, sorter_state_dict)
 
         self.criterion_mse = torch.nn.MSELoss()
         self.criterionl1 = torch.nn.L1Loss()
@@ -125,7 +124,7 @@ class SpearmanLoss(torch.nn.Module):
         self.lbd = lbd
 
     def forward(self, mem_pred, mem_gt, pr=False):
-        rank_gt = get_rank(mem_gt)
+        rank_gt = utils.get_rank(mem_gt)
 
         rank_pred = self.sorter(mem_pred.unsqueeze(
             0)).view(-1)

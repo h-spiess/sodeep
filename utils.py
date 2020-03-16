@@ -65,7 +65,7 @@ def build_vocab(sentences):
 
 def save_checkpoint(state, is_best, model_name, epoch):
     if is_best:
-        torch.save(state, './weights/best_' + model_name + ".pth.tar")
+        torch.save(state, './sodeep/weights/best_' + model_name + ".pth.tar")
 
 
 def count_parameters(model):

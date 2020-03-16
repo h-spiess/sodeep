@@ -24,7 +24,7 @@ Author: Martin Engilberge
 import torch
 import torch.nn as nn
 
-from utils import get_rank
+from sodeep import utils
 
 
 def model_loader(model_type, seq_len, pretrained_state_dict=None):
@@ -87,7 +87,7 @@ class UpdatingWrapper(nn.Module):
             input_opti = input_opti.cuda()
             input_opti.requires_grad = True
 
-            rank_gt = get_rank(input_opti)
+            rank_gt = utils.get_rank(input_opti)
 
             out_opti = self.sorter(input_opti)
 
